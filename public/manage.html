@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Vote Management</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css">
+  <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
+</head>
+<body class="bg-gray-100 flex items-center justify-center h-screen">
+  <div class="bg-white shadow-md rounded-lg p-6 max-w-lg w-full">
+    <h1 class="text-2xl font-bold text-center mb-4">Vote Management</h1>
+
+    <!-- Existing options -->
+    <div id="options-list" class="space-y-4">
+      <h2 class="text-xl font-semibold">Existing Options</h2>
+      <ul id="option-items" class="list-disc list-inside space-y-2">
+        <!-- Dynamic options will be inserted here -->
+      </ul>
+    </div>
+
+    <!-- Add option -->
+    <div class="mt-6">
+      <h2 class="text-xl font-semibold mb-2">Add New Option</h2>
+      <form id="add-option-form" class="flex space-x-2">
+        <input 
+          type="text" 
+          id="new-option" 
+          placeholder="Option Name" 
+          class="w-full border rounded-md px-3 py-2" 
+          required>
+        <button 
+          type="submit" 
+          class="bg-blue-500 text-white px-4 py-2 rounded-md hover:bg-blue-600">
+          Add
+        </button>
+      </form>
+    </div>
+
+    <!-- Notification area -->
+    <div id="notification" class="mt-4 text-sm text-center text-red-500 hidden">
+      <!-- Error or success messages will be shown here -->
+    </div>
+  </div>
+
+  <script>
+    const API_URL = 'http://localhost:3000'; // Replace with your backend URL
+
+    // Fetch and display existing options
+    async function fetchOptions() {
+      try {
+        const response = await axios.get(`${API_URL}/votes`);
+        const options = response.data;
+        const optionItems = document.getElementById('option-items');
+        optionItems.innerHTML = '';
+
+        options.forEach(option => {
+          const listItem = document.createElement('li');
+          listItem.className = 'flex justify-between items-center';
+          listItem.innerHTML = `
+            <span>${option.name}</span>
+            <button
+              class="bg-red-500 text-white px-2 py-1 rounded-md hover:bg-red-600"
+              onclick="deleteOption(${option.id})">
+              Delete
+            </button>
+          `;
+          optionItems.appendChild(listItem);
+        });
+      } catch (error) {
+        showError('Failed to fetch options.');
+      }
+    }
+
+    // Add a new option
+    document.getElementById('add-option-form').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const newOption = document.getElementById('new-option').value.trim();
+
+      if (!newOption) {
+        showError('Option name cannot be empty.');
+        return;
+      }
+
+      try {
+        await axios.post(`${API_URL}/create-option`, { name: newOption });
+        document.getElementById('new-option').value = '';
+        fetchOptions();
+        showSuccess('Option added successfully.');
+      } catch (error) {
+        showError('Failed to add option.');
+      }
+    });
+
+    // Delete an option
+    async function deleteOption(optionId) {
+      try {
+        await axios.delete(`${API_URL}/delete-option/${optionId}`);
+        fetchOptions();
+        showSuccess('Option deleted successfully.');
+      } catch (error) {
+        showError('Failed to delete option.');
+      }
+    }
+
+    // Show error message
+    function showError(message) {
+      const notification = document.getElementById('notification');
+      notification.textContent = message;
+      notification.classList.remove('hidden', 'text-green-500');
+      notification.classList.add('text-red-500');
+      setTimeout(() => notification.classList.add('hidden'), 3000);
+    }
+
+    // Show success message
+    function showSuccess(message) {
+      const notification = document.getElementById('notification');
+      notification.textContent = message;
+      notification.classList.remove('hidden', 'text-red-500');
+      notification.classList.add('text-green-500');
+      setTimeout(() => notification.classList.add('hidden'), 3000);
+    }
+
+    // Initialize the page
+    fetchOptions();
+  </script>
+</body>
+</html>

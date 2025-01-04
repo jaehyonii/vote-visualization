@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Real-Time Voting</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css">
+  <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/socket.io-client/dist/socket.io.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body class="bg-gray-100 flex items-center justify-center h-screen">
+  <div id="app" class="bg-white shadow-md rounded-lg p-6 max-w-xl w-full">
+    <h1 class="text-2xl font-bold text-center mb-4">Real-Time Voting</h1>
+
+    <div id="vote-page">
+      <form id="vote-form" class="space-y-4">
+        <!-- Options will be dynamically inserted here -->
+        <div id="vote-options" class="space-y-2"></div>
+        <button type="submit" class="w-full bg-blue-500 text-white px-4 py-2 rounded-md hover:bg-blue-600">Submit Vote</button>
+      </form>
+    </div>
+
+    <div id="chart-page" style="display: none;">
+      <canvas id="voteChart" width="400" height="200"></canvas>
+    </div>
+
+	
+  </div>
+
+  <script>
+    // Backend API URL
+    const API_URL = 'http://localhost:3000'; // Replace with your backend URL
+
+    // Connect to WebSocket server
+    const socket = io(API_URL);
+
+    // Initialize chart
+    const ctx = document.getElementById('voteChart').getContext('2d');
+    const voteChart = new Chart(ctx, {
+      type: 'bar',
+      data: {
+        labels: [], // Option names
+        datasets: [{
+          label: 'Votes',
+          data: [], // Vote counts
+          backgroundColor: 'rgba(54, 162, 235, 0.2)',
+          borderColor: 'rgba(54, 162, 235, 1)',
+          borderWidth: 1
+        }]
+      },
+      options: {
+        scales: {
+          y: {
+            beginAtZero: true
+          }
+        },
+		ticks: {
+          stepSize: 1 // Y축 단위를 1로 설정
+        }
+      }
+    });
+
+    // Function to render options
+    function renderOptions(options) {
+      const container = document.getElementById('vote-options');
+      container.innerHTML = '';
+
+      options.forEach(option => {
+        const optionElement = document.createElement('div');
+        optionElement.className = 'flex items-center space-x-2';
+
+        optionElement.innerHTML = `
+          <input type="radio" id="option-${option.id}" name="voteOption" value="${option.id}" class="form-radio">
+          <label for="option-${option.id}" class="font-medium">${option.name}</label>
+        `;
+
+        container.appendChild(optionElement);
+      });
+    }
+
+    // Function to update chart
+    function updateChart(options) {
+      voteChart.data.labels = options.map(option => option.name);
+      voteChart.data.datasets[0].data = options.map(option => option.votes);
+      voteChart.update();
+    }
+
+    // Fetch initial data
+    async function fetchVotes() {
+      try {
+        const response = await axios.get(`${API_URL}/votes`);
+        renderOptions(response.data);
+        updateChart(response.data);
+      } catch (error) {
+        console.error('Error fetching votes:', error);
+      }
+    }
+
+    // Cast a vote and switch to chart page
+    async function castVote(optionId) {
+		if (localStorage.getItem('hasVoted')) {
+			alert('You have already voted!');
+			document.getElementById('vote-page').style.display = 'none';
+			document.getElementById('chart-page').style.display = 'block';
+			return;
+		}
+
+		try {
+			await axios.post(`${API_URL}/vote`, { id: optionId });
+			localStorage.setItem('hasVoted', true); // 투표 여부 저장
+			document.getElementById('vote-page').style.display = 'none';
+			document.getElementById('chart-page').style.display = 'block';
+		} catch (error) {
+			console.error('Error casting vote:', error);
+		}
+	}
+
+    // Handle form submission
+    document.getElementById('vote-form').addEventListener('submit', (e) => {
+      e.preventDefault();
+      const selectedOption = document.querySelector('input[name="voteOption"]:checked');
+      if (selectedOption) {
+        castVote(parseInt(selectedOption.value));
+      } else {
+        alert('Please select an option before submitting.');
+      }
+    });
+
+    // Listen for real-time updates
+    socket.on('voteUpdate', (updatedOptions) => {
+      updateChart(updatedOptions);
+    });
+
+    // Initialize the app
+    fetchVotes();
+  </script>
+</body>
+</html>
